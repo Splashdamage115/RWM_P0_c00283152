@@ -19,3 +19,5 @@
     label{display: block; margin: 1rem 0; }
     input{ width: 100%; max-width: 30rem; }
 </style>
+
+<a href="/combined">combined filter</a>
