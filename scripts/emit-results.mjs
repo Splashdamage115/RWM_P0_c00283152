@@ -1,7 +1,7 @@
-import { writeFileSync } from 'node.fs';
-import { pathRoFileURL } from 'node:url';
+import { writeFileSync } from 'fs';
+import { pathToFileURL } from 'node:url';
 
-const mod = await import(pathToFileURL('$src/lib/combined/combined.ts').href);
+const mod = await import(pathToFileURL('src/lib/filters/combined/combined.ts').href);
 const { combinedFilter } = mod;
 
 const inputs = {
@@ -16,6 +16,6 @@ for (const [k, arr] of Object.entries(inputs)) {
     outputs[k] = combinedFilter(arr);
 }
 
-const artefact = {filterOrder: 'mine->peer', input, outputs};
+const artefact = {filterOrder: 'mine->peer', inputs, outputs};
 writeFileSync('static/combined-results.json', JSON.stringify(artefact, null, 2));
 console.log('Wrote static/combined-results.json');
