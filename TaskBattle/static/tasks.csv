@@ -1,0 +1,7 @@
+"id","name","description"
+"1","Build Login System","Create a secure user authentication system with JWT tokens"
+"2","Design Homepage","Create an attractive and responsive homepage layout"
+"3","Database Migration","Migrate legacy data to new PostgreSQL database"
+"4","API Documentation","Write comprehensive API documentation using Swagger"
+"5","Unit Tests","Implement comprehensive unit testing for core modules"
+
