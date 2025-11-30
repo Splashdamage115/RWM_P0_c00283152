@@ -14,18 +14,18 @@
   let loading = true;
   let error = '';
 
-  onMount(async () => {
+  onMount(() => {
     try {
-      // Load tasks from CSV
-      const response = await fetch('/new_tasks.csv');
-      const csvContent = await response.text();
-      const tasks = parseCsv(csvContent);
-      console.log('Loaded tasks:', tasks);
-      
-      // Generate tournament bracket
+      const saved = localStorage.getItem('taskBattleResults');
+      let tasks = [];
+      if (saved) {
+        tasks = JSON.parse(saved);
+        console.log('Loaded tasks from localStorage:', tasks);
+      } else {
+        tasks = [];
+        console.log('No tasks found in localStorage, starting empty tournament.');
+      }
       tournament = generateBracket(tasks);
-      console.log('Generated tournament:', tournament);
-      
       loading = false;
     } catch (err) {
       console.error('Error loading tournament:', err);
@@ -46,12 +46,27 @@
     miniGameVisible = true;
   }
 
+  import { advanceWinner } from '$lib/utils/bracketGenerator.js';
+
   function handleWinnerSelected(event: CustomEvent<{ winner: Task }>) {
     const { winner } = event.detail;
-    // Update the tournament with the winner
-    tournament.tasks = tournament.tasks.filter(task => task !== miniGameTasks.task1 && task !== miniGameTasks.task2);
-    tournament.tasks.push(winner);
-    tournament = generateBracket(tournament.tasks);
+    // Find the current match id for the mini game
+    let matchId = '';
+    for (const round of tournament.rounds) {
+      for (const match of round.matches) {
+        if (
+          match.task1 && miniGameTasks.task1 && match.task1.id === miniGameTasks.task1.id &&
+          match.task2 && miniGameTasks.task2 && match.task2.id === miniGameTasks.task2.id
+        ) {
+          matchId = match.id;
+          break;
+        }
+      }
+      if (matchId) break;
+    }
+    if (matchId) {
+      tournament = advanceWinner(tournament, matchId, winner);
+    }
 
     // Add battle animation
     const task1Element = document.querySelector('.task1') as HTMLElement;
@@ -82,6 +97,22 @@
 </svelte:head>
 
 <main>
+  <button
+    style="margin-bottom: 24px; padding: 10px 20px; font-size: 1em; border-radius: 8px; background: #007bff; color: white; border: none; cursor: pointer;"
+    on:click={() => {
+      const sampleTasks = [
+        { id: 'a', name: 'Task A', description: 'Debug task A' },
+        { id: 'b', name: 'Task B', description: 'Debug task B' },
+        { id: 'c', name: 'Task C', description: 'Debug task C' },
+        { id: 'd', name: 'Task D', description: 'Debug task D' },
+        { id: 'e', name: 'Task E', description: 'Debug task E' }
+      ];
+      localStorage.setItem('taskBattleResults', JSON.stringify(sampleTasks));
+      window.location.reload();
+    }}
+  >
+    Fill Debug Tasks
+  </button>
   {#if loading}
     <div class="loading-container">
       <div class="loading-spinner"></div>

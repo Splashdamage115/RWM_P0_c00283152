@@ -67,7 +67,8 @@ export function generateBracket(tasks: Task[]): Tournament {
   const totalRounds = Math.log2(bracketSize);
   
   const rounds: BracketRound[] = [];
-  
+  let eliminatedMap: Record<string, boolean> = {};
+
   // Generate first round with actual tasks
   const firstRound: BracketRound = {
     round: 1,
@@ -78,31 +79,34 @@ export function generateBracket(tasks: Task[]): Tournament {
     const task1 = paddedTasks[i];
     const task2 = paddedTasks[i + 1];
     
+    let winner = null;
+    let status: 'pending' | 'completed' = 'pending';
+
+    // Only auto-advance for initial bye rounds (first round)
+    if (!task1 && task2) {
+      winner = task2;
+      status = 'completed';
+    } else if (task1 && !task2) {
+      winner = task1;
+      status = 'completed';
+    }
+
     const match: BracketMatch = {
       id: `round-1-match-${i / 2}`,
       round: 1,
       position: i / 2,
       task1: task1,
       task2: task2,
-      winner: null,
-      status: 'pending'
+      winner,
+      status
     };
-
-    // If one task is null (bye), the other automatically advances
-    if (!task1 && task2) {
-      match.winner = task2;
-      match.status = 'completed';
-    } else if (task1 && !task2) {
-      match.winner = task1;
-      match.status = 'completed';
-    }
 
     firstRound.matches.push(match);
   }
 
   rounds.push(firstRound);
 
-  // Generate subsequent rounds
+  // Generate subsequent rounds, keeping all original tasks visible
   for (let round = 2; round <= totalRounds; round++) {
     const previousRound = rounds[round - 2];
     const currentRound: BracketRound = {
@@ -110,15 +114,43 @@ export function generateBracket(tasks: Task[]): Tournament {
       matches: []
     };
 
+    function isBye(match: BracketMatch | undefined): boolean {
+      if (!match) return false;
+      // First round: bye if one participant is null
+      if (match.round === 1) return !match.task1 || !match.task2;
+      // For subsequent rounds, bye if previous match was a bye and winner auto-advanced
+      return isBye(rounds[match.round - 2]?.matches[match.position * 2]) || isBye(rounds[match.round - 2]?.matches[match.position * 2 + 1]);
+    }
+
     for (let i = 0; i < previousRound.matches.length; i += 2) {
+      const prevMatch1 = previousRound.matches[i];
+      const prevMatch2 = previousRound.matches[i + 1];
+
+      let task1 = prevMatch1 && prevMatch1.winner ? prevMatch1.winner : null;
+      let task2 = prevMatch2 && prevMatch2.winner ? prevMatch2.winner : null;
+      let winner = null;
+      let status: 'pending' | 'completed' = 'pending';
+
+      // Auto-advance if only one participant and their previous match was a bye,
+      // but NOT in the final round
+      if (round < totalRounds) {
+        if (task1 && !task2 && isBye(prevMatch1)) {
+          winner = task1;
+          status = 'completed';
+        } else if (!task1 && task2 && isBye(prevMatch2)) {
+          winner = task2;
+          status = 'completed';
+        }
+      }
+
       const match: BracketMatch = {
         id: `round-${round}-match-${i / 2}`,
         round: round,
         position: i / 2,
-        task1: null, // Will be filled when previous matches complete
-        task2: null, // Will be filled when previous matches complete
-        winner: null,
-        status: 'pending'
+        task1,
+        task2,
+        winner,
+        status
       };
 
       currentRound.matches.push(match);
