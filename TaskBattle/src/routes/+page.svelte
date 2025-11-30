@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import TournamentBracket from '$lib/components/TournamentBracket.svelte';
+  import MiniGame from '$lib/components/MiniGame.svelte';
   import { parseCsv } from '$lib/utils/csvParser.js';
   import { generateBracket } from '$lib/utils/bracketGenerator.js';
-  import type { Tournament } from '$lib/types/Task.js';
+  import type { Tournament, Task } from '$lib/types/Task.js';
 
   let tournament: Tournament = {
     tasks: [],
@@ -17,8 +18,8 @@
     try {
       // Load tasks from CSV
       const response = await fetch('/new_tasks.csv');
-const csvContent = await response.text();
-const tasks = parseCsv(csvContent);
+      const csvContent = await response.text();
+      const tasks = parseCsv(csvContent);
       console.log('Loaded tasks:', tasks);
       
       // Generate tournament bracket
@@ -35,6 +36,43 @@ const tasks = parseCsv(csvContent);
 
   function handleTournamentUpdate(updatedTournament: Tournament) {
     tournament = updatedTournament;
+  }
+
+  let miniGameVisible = false;
+  let miniGameTasks = { task1: null as Task | null, task2: null as Task | null };
+
+  function startMiniGame(task1: Task, task2: Task) {
+    miniGameTasks = { task1, task2 };
+    miniGameVisible = true;
+  }
+
+  function handleWinnerSelected(event: CustomEvent<{ winner: Task }>) {
+    const { winner } = event.detail;
+    // Update the tournament with the winner
+    tournament.tasks = tournament.tasks.filter(task => task !== miniGameTasks.task1 && task !== miniGameTasks.task2);
+    tournament.tasks.push(winner);
+    tournament = generateBracket(tournament.tasks);
+
+    // Add battle animation
+    const task1Element = document.querySelector('.task1') as HTMLElement;
+    const task2Element = document.querySelector('.task2') as HTMLElement;
+
+    if (task1Element && task2Element) {
+      task1Element.style.transition = 'transform 1s ease-in-out';
+      task2Element.style.transition = 'transform 1s ease-in-out, background-color 1s ease-in-out';
+
+      task1Element.style.transform = 'translateX(100px)';
+      task2Element.style.transform = 'translateY(100px)';
+      task2Element.style.backgroundColor = 'red';
+
+      setTimeout(() => {
+        task1Element.style.transform = '';
+        task2Element.style.transform = '';
+        task2Element.style.backgroundColor = '';
+      }, 1000);
+    }
+
+    miniGameVisible = false;
   }
 </script>
 
@@ -56,7 +94,11 @@ const tasks = parseCsv(csvContent);
       <button on:click={() => window.location.reload()}>Try Again</button>
     </div>
   {:else}
-    <TournamentBracket {tournament} onTournamentUpdate={handleTournamentUpdate} />
+    {#if miniGameVisible}
+      <MiniGame task1={miniGameTasks.task1!} task2={miniGameTasks.task2!} on:winnerSelected={handleWinnerSelected} />
+    {:else}
+      <TournamentBracket {tournament} onTournamentUpdate={handleTournamentUpdate} startMiniGame={(task1: Task | null, task2: Task | null) => startMiniGame(task1!, task2!)} />
+    {/if}
   {/if}
 </main>
 

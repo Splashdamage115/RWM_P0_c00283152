@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { BracketMatch } from '../types/Task.js';
+  import { fly } from 'svelte/transition';
   
   export let match: BracketMatch;
   export let onMatchClick: (match: BracketMatch) => void = () => {};
@@ -41,7 +42,7 @@
   </div>
   
   {#if match.winner}
-    <div class="winner-banner">
+    <div class="winner-banner" transition:fly="{{ y: -20, duration: 500 }}">
       🏆 Winner: {match.winner.name}
     </div>
   {/if}

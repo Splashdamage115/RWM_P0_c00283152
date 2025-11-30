@@ -1,16 +1,18 @@
 <script lang="ts">
   import type { Tournament, BracketMatch } from '../types/Task.js';
   import BracketRoundComponent from './BracketRound.svelte';
-  import { advanceWinner } from '../utils/bracketGenerator.js';
+  import { generateBracket } from '../utils/bracketGenerator.js';
+  import { exportTournamentToCsv } from '../utils/csvParser.js';
   
   export let tournament: Tournament;
   export let onTournamentUpdate: (tournament: Tournament) => void = () => {};
+  export let startMiniGame: (task1: BracketMatch['task1'], task2: BracketMatch['task2']) => void;
   
   function handleMatchClick(match: BracketMatch) {
     // This is where mini-game integration will go
     // For now, we'll just show an alert
     console.log('Match clicked:', match);
-    alert(`Future mini-game will determine winner between:\n${match.task1?.name} vs ${match.task2?.name}`);
+    startMiniGame(match.task1, match.task2);
   }
   
   // Helper function to get tournament status
@@ -31,6 +33,15 @@
   }
   
   $: tournamentStatus = getTournamentStatus();
+
+  // Export CSV when tournament is completed
+  $: if (tournamentStatus === 'completed' && tournament.winner) {
+    const csvContent = exportTournamentToCsv(tournament);
+    // Write CSV to static/tasks.csv (requires server-side or API call in real app)
+    // For demo, log to console
+    console.log('Exporting tournament results to CSV:', csvContent);
+    // TODO: Implement actual file write if running in Node/server context
+  }
 </script>
 
 <div class="tournament-bracket">

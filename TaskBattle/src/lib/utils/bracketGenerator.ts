@@ -1,5 +1,41 @@
 import type { Task, BracketMatch, BracketRound, Tournament } from '../types/Task.js';
 
+export function assignTaskPriorities(tournament: Tournament): Task[] {
+  // Map taskId to furthest round reached
+  const roundMap: Record<string, number> = {};
+  tournament.rounds.forEach(round => {
+    round.matches.forEach(match => {
+      [match.task1, match.task2].forEach(task => {
+        if (task && task.id) {
+          const prev = roundMap[task.id] ?? 0;
+          roundMap[task.id] = Math.max(prev, round.round);
+        }
+      });
+      if (match.winner && match.winner.id) {
+        roundMap[match.winner.id] = Math.max(roundMap[match.winner.id] ?? 0, round.round);
+      }
+    });
+  });
+
+  // Determine max round (final)
+  const maxRound = tournament.rounds.length;
+
+  return tournament.tasks.map(task => {
+    const roundReached = roundMap[task.id] ?? 0;
+    let priority: 'high' | 'medium' | 'low' = 'low';
+    if (tournament.winner && task.id === tournament.winner.id) {
+      priority = 'high';
+    } else if (roundReached === maxRound || roundReached === maxRound - 1) {
+      priority = 'medium';
+    }
+    return {
+      ...task,
+      winner: tournament.winner && task.id === tournament.winner.id ? true : false,
+      priority
+    };
+  });
+}
+
 export function generateBracket(tasks: Task[]): Tournament {
   if (tasks.length === 0) {
     return {

@@ -2,6 +2,8 @@ export interface Task {
   id: string;
   name: string;
   description: string;
+  winner?: boolean;
+  priority?: 'high' | 'medium' | 'low';
 }
 
 export interface BracketMatch {
