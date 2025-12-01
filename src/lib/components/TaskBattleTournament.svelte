@@ -20,10 +20,14 @@
   let error = '';
 
   onMount(() => {
+    loading = false;
+  });
+
+  // React to changes in tasks prop
+  $: {
     try {
-      // Use provided tasks or load from localStorage
       let tournamentTasks = tasks;
-      if (tournamentTasks.length === 0) {
+      if (tournamentTasks.length === 0 && typeof localStorage !== 'undefined') {
         const saved = localStorage.getItem('taskBattleResults');
         if (saved) {
           tournamentTasks = JSON.parse(saved);
@@ -32,13 +36,12 @@
       }
       
       tournament = generateBracket(tournamentTasks);
-      loading = false;
+      console.log('Generated tournament with tasks:', tournamentTasks);
     } catch (err) {
-      console.error('Error loading tournament:', err);
+      console.error('Error generating tournament:', err);
       error = err instanceof Error ? err.message : 'Unknown error occurred';
-      loading = false;
     }
-  });
+  }
 
   // Watch for tournament winner and call callback
   $: if (tournament.winner) {

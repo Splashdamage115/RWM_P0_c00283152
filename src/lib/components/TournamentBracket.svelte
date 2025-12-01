@@ -3,7 +3,7 @@
   import { assignTaskPriorities } from '../utils/bracketGenerator.js';
   import { exportTournamentToCsv } from '../utils/csvParser.js';
 
-  $: if (tournament && tournament.rounds && tournament.rounds.length > 0 && tournament.winner) {
+  $: if (tournament && tournament.rounds && tournament.rounds.length > 0 && tournament.winner && typeof localStorage !== 'undefined') {
     const prioritizedTasks = assignTaskPriorities(tournament);
     localStorage.setItem('taskBattleResults', JSON.stringify(prioritizedTasks));
     console.log('Saved prioritized tasks to localStorage:', prioritizedTasks);
@@ -17,24 +17,26 @@
     startMiniGame(match.task1, match.task2);
   }
 
-  // Calculate vertical positions for each match in each round
+  // Calculate responsive vertical positions for each match in each round
   function getMatchPositions(rounds: BracketRound[]) {
     const positions: number[][] = [];
-    let prevRoundY: number[] = [];
-    const matchHeight = 120; // Increased to accommodate taller cards
-    const matchGap = 60; // Increased gap to prevent overlap
+    const matchHeight = typeof window !== 'undefined' 
+      ? Math.max(80, Math.min(120, window.innerHeight / 8)) 
+      : 100; // Default height for SSR
+    const matchGap = typeof window !== 'undefined' 
+      ? Math.max(40, Math.min(80, window.innerHeight / 15)) 
+      : 60; // Default gap for SSR
 
     for (let r = 0; r < rounds.length; r++) {
       const round = rounds[r];
       const roundPositions: number[] = [];
       const totalHeight = round.matches.length * matchHeight + (round.matches.length - 1) * matchGap;
-      let startY = (maxBracketHeight(rounds) - totalHeight) / 2;
+      let startY = Math.max(20, (maxBracketHeight(rounds) - totalHeight) / 2);
 
       for (let m = 0; m < round.matches.length; m++) {
         roundPositions.push(startY + m * (matchHeight + matchGap));
       }
       positions.push(roundPositions);
-      prevRoundY = roundPositions;
     }
     return positions;
   }
@@ -44,34 +46,41 @@
     for (const round of rounds) {
       if (round.matches.length > maxMatches) maxMatches = round.matches.length;
     }
-    return maxMatches * 120 + (maxMatches - 1) * 60 + 120; // Updated for new sizing
+    const matchHeight = typeof window !== 'undefined' 
+      ? Math.max(80, Math.min(120, window.innerHeight / 8)) 
+      : 100;
+    const matchGap = typeof window !== 'undefined' 
+      ? Math.max(40, Math.min(80, window.innerHeight / 15)) 
+      : 60;
+    return Math.max(400, maxMatches * matchHeight + (maxMatches - 1) * matchGap + 120);
+  }
+
+  // Get responsive round spacing
+  function getRoundSpacing() {
+    return typeof window !== 'undefined' 
+      ? Math.max(250, Math.min(350, window.innerWidth / 5)) 
+      : 300; // Default spacing for SSR
+  }
+
+  // Get responsive match width
+  function getMatchWidth() {
+    return typeof window !== 'undefined' 
+      ? Math.max(200, Math.min(280, window.innerWidth / 6)) 
+      : 220; // Default width for SSR
   }
 </script>
 
 <div class="bracket-root">
   {#if tournament.rounds.length > 0}
-    <div class="round-labels">
-      {#each tournament.rounds as round, roundIdx}
-        <div class="round-label" style="left: {roundIdx * 320 + 110}px;">
-          {#if roundIdx === tournament.rounds.length - 1}
-            🏆 Final
-          {:else if roundIdx === tournament.rounds.length - 2}
-            🥉 Semi-Final
-          {:else}
-            Round {roundIdx + 1}
-          {/if}
-        </div>
-      {/each}
-    </div>
     
     {#key tournament.rounds}
-      <div class="bracket-horizontal" style="height: {maxBracketHeight(tournament.rounds)}px;">
+      <div class="bracket-horizontal" style="height: {maxBracketHeight(tournament.rounds)}px; min-width: {tournament.rounds.length * getRoundSpacing() + 200}px;">
           {#each tournament.rounds as round, roundIdx}
-            <div class="bracket-round" style="height: {maxBracketHeight(tournament.rounds)}px; left: {roundIdx * 320}px; position: absolute;">
+            <div class="bracket-round" style="height: {maxBracketHeight(tournament.rounds)}px; left: {roundIdx * getRoundSpacing()}px; position: absolute; width: {getMatchWidth()}px;">
               {#each round.matches as match, matchIdx}
               <div
                 class="bracket-match {match.task1 && match.task2 && match.status === 'pending' ? 'clickable' : ''}"
-                style="top: {getMatchPositions(tournament.rounds)[roundIdx][matchIdx]}px; position: absolute;"
+                style="top: {getMatchPositions(tournament.rounds)[roundIdx][matchIdx]}px; position: absolute; width: {getMatchWidth()}px;"
                 on:click={() => (match.task1 && match.task2 && match.status === 'pending') ? handleMatchClick(match) : null}
                 style:cursor={match.task1 && match.task2 && match.status === 'pending' ? 'pointer' : 'default'}
               >
@@ -101,10 +110,10 @@
                 {#if tournament.rounds[roundIdx + 1]}
                   <!-- Connect current match to next round's winner slot -->
                   <line
-                    x1={roundIdx * 320 + 220}
-                    y1={getMatchPositions(tournament.rounds)[roundIdx][matchIdx] + 40}
-                    x2={(roundIdx + 1) * 320}
-                    y2={getMatchPositions(tournament.rounds)[roundIdx + 1][Math.floor(matchIdx / 2)] + 40}
+                    x1={roundIdx * getRoundSpacing() + getMatchWidth() * 0.85}
+                    y1={getMatchPositions(tournament.rounds)[roundIdx][matchIdx] + (typeof window !== 'undefined' ? Math.max(40, Math.min(60, window.innerHeight / 20)) : 50)}
+                    x2={(roundIdx + 1) * getRoundSpacing()}
+                    y2={getMatchPositions(tournament.rounds)[roundIdx + 1][Math.floor(matchIdx / 2)] + (typeof window !== 'undefined' ? Math.max(40, Math.min(60, window.innerHeight / 20)) : 50)}
                     stroke="#cbd5e0"
                     stroke-width="3"
                     stroke-dasharray="5,5"
@@ -117,7 +126,7 @@
         {#if tournament.winner}
           <div
             class="bracket-winner"
-            style="top: {getMatchPositions(tournament.rounds)[tournament.rounds.length - 1][0] - 20}px; left: {(tournament.rounds.length) * 320 + 60}px;"
+            style="top: {getMatchPositions(tournament.rounds)[tournament.rounds.length - 1][0] - 20}px; left: {(tournament.rounds.length) * getRoundSpacing() + (typeof window !== 'undefined' ? Math.max(50, Math.min(80, window.innerWidth / 20)) : 60)}px;"
           >
             <span>{tournament.winner.name}</span>
           </div>
@@ -129,7 +138,7 @@
 
 <style>
   .bracket-root {
-    width: 100vw;
+    width: 100%;
     min-height: 100vh;
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     display: flex;
@@ -137,54 +146,31 @@
     justify-content: flex-start;
     position: relative;
     overflow-x: auto;
-    padding: 40px 20px 20px;
-  }
-
-  .round-labels {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    width: calc(100% - 40px);
-    height: 30px;
-    z-index: 5;
-  }
-
-  .round-label {
-    position: absolute;
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #495057;
-    text-align: center;
-    padding: 6px 16px;
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-    border-radius: 20px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    border: 2px solid #dee2e6;
-    transform: translateX(-50%);
+    overflow-y: auto;
+    padding: clamp(15px, 3vw, 40px) clamp(10px, 2vw, 20px);
+    box-sizing: border-box;
   }
 
   .bracket-horizontal {
     display: block;
     position: relative;
     width: 100%;
-    margin-top: 50px;
+    margin-top: clamp(20px, 3vh, 30px);
   }
 
   .bracket-round {
     position: absolute;
     top: 0;
     left: 0;
-    width: 240px;
     height: 100%;
   }
 
   .bracket-match {
     background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
     border: 2px solid #dee2e6;
-    border-radius: 16px;
-    padding: 12px 16px;
-    width: 220px;
-    min-height: 80px;
+    border-radius: clamp(12px, 2vw, 16px);
+    padding: clamp(8px, 1.5vw, 16px);
+    min-height: clamp(80px, 8vh, 120px);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -193,7 +179,7 @@
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     transition: all 0.3s ease;
     position: absolute;
-    margin-bottom: 32px;
+    box-sizing: border-box;
   }
   .bracket-match:hover {
     border-color: #007bff;
@@ -233,22 +219,27 @@
     }
   }
   .match-participant {
-    font-size: 0.9rem;
+    font-size: clamp(0.75rem, 2vw, 0.95rem);
     color: #495057;
-    margin: 2px 0;
+    margin: clamp(2px, 0.5vh, 4px) 0;
     font-weight: 600;
     opacity: 1;
     transition: all 0.3s ease;
     border: 2px solid transparent;
-    border-radius: 8px;
-    padding: 4px 8px;
+    border-radius: clamp(6px, 1.5vw, 10px);
+    padding: clamp(4px, 1vw, 8px);
     background: rgba(248, 249, 250, 0.8);
     text-align: center;
     width: 100%;
     word-wrap: break-word;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    line-height: 1.3;
+    min-height: 1.5em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
   }
 
   .match-participant.pending {
@@ -287,16 +278,19 @@
   }
 
   .match-winner {
-    margin-top: 8px;
-    font-size: 0.85rem;
+    margin-top: clamp(4px, 1vh, 8px);
+    font-size: clamp(0.7rem, 1.8vw, 0.9rem);
     color: #28a745;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    padding: 4px 8px;
+    padding: clamp(2px, 0.8vw, 6px) clamp(4px, 1.2vw, 8px);
     background: rgba(40, 167, 69, 0.1);
-    border-radius: 12px;
+    border-radius: clamp(8px, 2vw, 12px);
     border: 1px solid rgba(40, 167, 69, 0.3);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.2;
   }
 
   .bracket-lines {
@@ -313,23 +307,27 @@
     position: absolute;
     background: linear-gradient(135deg, #ffd700 0%, #ffed4a 100%);
     color: #856404;
-    padding: 24px 40px;
-    border-radius: 20px;
-    font-size: 1.6rem;
+    padding: clamp(16px, 3vw, 32px) clamp(20px, 4vw, 40px);
+    border-radius: clamp(16px, 4vw, 24px);
+    font-size: clamp(1.2rem, 4vw, 1.8rem);
     font-weight: 800;
     box-shadow: 0 8px 32px rgba(255, 215, 0, 0.4);
     z-index: 10;
     border: 3px solid #f39c12;
     animation: winner-celebration 2s ease-in-out infinite alternate;
     text-align: center;
-    min-width: 200px;
+    min-width: clamp(150px, 20vw, 250px);
+    max-width: 90vw;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    box-sizing: border-box;
   }
 
   .bracket-winner::before {
     content: "🏆";
-    font-size: 2rem;
+    font-size: clamp(1.5rem, 5vw, 2.2rem);
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: clamp(4px, 1vh, 8px);
     animation: trophy-bounce 1s ease-in-out infinite alternate;
   }
 
@@ -347,5 +345,91 @@
   @keyframes trophy-bounce {
     from { transform: translateY(0px); }
     to { transform: translateY(-5px); }
+  }
+
+  /* Mobile and Touch Device Optimizations */
+  @media (max-width: 768px) {
+    .bracket-root {
+      padding: 10px 5px;
+    }
+
+    .bracket-match {
+      min-height: 70px;
+      touch-action: manipulation;
+    }
+
+    .bracket-match.clickable::after {
+      content: "👆 Tap to Battle!";
+      font-size: 0.7em;
+      bottom: -20px;
+    }
+
+    .match-participant {
+      font-size: 0.75rem;
+      padding: 3px 6px;
+      min-height: 1.2em;
+    }
+
+    .bracket-winner {
+      max-width: 95vw;
+      left: 50% !important;
+      transform: translateX(-50%);
+      position: fixed !important;
+      top: 50% !important;
+      margin-top: -100px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .bracket-root {
+      padding: 5px;
+    }
+
+    .bracket-horizontal {
+      margin-top: 20px;
+    }
+
+    .match-participant {
+      font-size: 0.7rem;
+      line-height: 1.1;
+      padding: 2px 4px;
+    }
+
+    .match-winner {
+      font-size: 0.6rem;
+      padding: 1px 3px;
+      margin-top: 2px;
+    }
+  }
+
+  /* High DPI / Retina Displays */
+  @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .bracket-match {
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  /* Reduce motion for users who prefer it */
+  @media (prefers-reduced-motion: reduce) {
+    .bracket-match {
+      transition: none;
+    }
+
+    .bracket-match.clickable {
+      animation: none;
+    }
+
+    .match-participant.pending,
+    .match-participant.winner {
+      animation: none;
+    }
+
+    .bracket-winner {
+      animation: none;
+    }
+
+    .bracket-winner::before {
+      animation: none;
+    }
   }
 </style>
